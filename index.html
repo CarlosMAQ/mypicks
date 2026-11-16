@@ -1030,10 +1030,10 @@ function pushRemote(now) {
 }
 A.login = () => {
   const p = new firebase.auth.GoogleAuthProvider();
-  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-  (standalone ? FB.auth.signInWithRedirect(p) : FB.auth.signInWithPopup(p)).catch(e => {
-    if (/popup/.test(e.code) || e.code === 'auth/operation-not-supported-in-this-environment') FB.auth.signInWithRedirect(p);
-    else toast('Error al entrar: ' + e.code);
+  p.setCustomParameters({prompt: 'select_account'});
+  FB.auth.signInWithPopup(p).catch(e => {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') FB.auth.signInWithRedirect(p);
+    else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') toast('Error al entrar: ' + e.code);
   });
 };
 A.logout = () => FB.auth.signOut();
