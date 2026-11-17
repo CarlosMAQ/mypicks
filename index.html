@@ -100,12 +100,12 @@ details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-top:6px}
 <script>
 // ===== PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE =====
 const firebaseConfig = {
- apiKey: "AIzaSyA8e4gXilVUBatLGo0wEKFxq5bXPwiHq5M",
-  authDomain: "mypicks-5fbb7.firebaseapp.com",
-  projectId: "mypicks-5fbb7",
-  storageBucket: "mypicks-5fbb7.firebasestorage.app",
-  messagingSenderId: "987308001917",
-  appId: "1:987308001917:web:2aa8a94be741a8d1c17f14"
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
 };
 // ==================================================
 
@@ -258,6 +258,40 @@ const propDef = (lg, pos, prop) => posDef(lg, pos)?.props.find(x => x.id === pro
 const matchPos = (f, x) => !f ? true : Array.isArray(f) ? f.includes(x) : f(x);
 const isBig = d => /Yardas/.test(d.name);
 
+// columnas de estadísticas por posición (en vivo y últimos 5)
+const pair = (a, b) => a == null && b == null ? null : `${fmt(a ?? 0)}/${fmt(b ?? 0)}`;
+const COLS = {
+  QB:  [['C/A', m=>pair(v(m,'passing.completions','completions'), v(m,'passing.passingAttempts','passingAttempts'))], ['YDS', PY], ['TD', m=>v(m,'passing.passingTouchdowns','passingTouchdowns')], ['INT', m=>v(m,'passing.interceptions','interceptions')], ['YDS tierra', RY], ['TD tierra', m=>v(m,'rushing.rushingTouchdowns','rushingTouchdowns')]],
+  RB:  [['CAR', m=>v(m,'rushing.rushingAttempts','rushingAttempts')], ['YDS', RY], ['TD', TD], ['REC', REC], ['YDS rec', RECY], ['LARGA', m=>v(m,'rushing.longRushing','longRushing')]],
+  WR:  [['REC', REC], ['TGT', m=>v(m,'receiving.receivingTargets','receivingTargets')], ['YDS', RECY], ['TD', TD], ['LARGA', m=>v(m,'receiving.longReception','longReception')]],
+  NBA: [['MIN', m=>v(m,'minutes','MIN')], ['PTS', PTS], ['REB', REB], ['AST', AST], ['3PM', m=>v(m,'threePointFieldGoalsMade','3PM')], ['ROB', STL], ['TAP', BLK], ['PÉR', m=>v(m,'turnovers','TO')]],
+  JUG: [['G', GOL], ['A', m=>v(m,'goalAssists')], ['TIROS', m=>v(m,'totalShots')], ['A GOL', m=>v(m,'shotsOnTarget')], ['FALTAS', m=>v(m,'foulsCommitted')], ['TA', m=>v(m,'yellowCards')], ['ATAJ', m=>v(m,'saves')]],
+  PAR: [['CÓRNERS', m=>v(m,'wonCorners')], ['TARJETAS', m=>sum(v(m,'yellowCards'),v(m,'redCards'))], ['TIROS', m=>v(m,'totalShots')], ['A GOL', m=>v(m,'shotsOnTarget')]],
+  BAT: [['H', BH], ['C', BR], ['CI', BRBI], ['HR', m=>v(m,'batting.homeRuns','batting.HR')], ['BB', m=>v(m,'batting.walks','batting.BB')], ['K', m=>v(m,'batting.strikeouts','batting.K')]],
+  PIT: [['IP', m=>v(m,'pitching.fullInnings.partInnings','pitching.innings','pitching.IP')], ['K', m=>v(m,'pitching.strikeouts','pitching.K')], ['H', m=>v(m,'pitching.hits','pitching.H')], ['CL', m=>v(m,'pitching.earnedRuns','pitching.ER')], ['BB', m=>v(m,'pitching.walks','pitching.BB')]]
+};
+const colsFor = (lg, pos) => LEAGUES[lg].type === 'nba' ? COLS.NBA : COLS[pos] || [];
+const statLine = (cols, m) => { if (!m) return ''; const parts = cols.map(([k, f]) => { const x = f(m); return x == null ? null : `${typeof x === 'string' ? x : fmt(x)} ${k}`; }).filter(Boolean); return parts.join(' · '); };
+
+// país y zona horaria
+const COUNTRIES = [
+  ['🇲🇽 México (Centro)', 'America/Mexico_City'], ['🇲🇽 México (Tijuana / Baja California)', 'America/Tijuana'],
+  ['🇲🇽 México (Sonora)', 'America/Hermosillo'], ['🇲🇽 México (Sinaloa / Chihuahua / Nayarit)', 'America/Mazatlan'],
+  ['🇲🇽 México (Quintana Roo)', 'America/Cancun'], ['🇺🇸 EUA (Este)', 'America/New_York'], ['🇺🇸 EUA (Centro)', 'America/Chicago'],
+  ['🇺🇸 EUA (Montaña)', 'America/Denver'], ['🇺🇸 EUA (Pacífico)', 'America/Los_Angeles'], ['🇨🇦 Canadá (Este)', 'America/Toronto'],
+  ['🇪🇸 España', 'Europe/Madrid'], ['🇦🇷 Argentina', 'America/Argentina/Buenos_Aires'], ['🇨🇴 Colombia', 'America/Bogota'],
+  ['🇨🇱 Chile', 'America/Santiago'], ['🇵🇪 Perú', 'America/Lima'], ['🇪🇨 Ecuador', 'America/Guayaquil'], ['🇻🇪 Venezuela', 'America/Caracas'],
+  ['🇺🇾 Uruguay', 'America/Montevideo'], ['🇵🇾 Paraguay', 'America/Asuncion'], ['🇧🇴 Bolivia', 'America/La_Paz'],
+  ['🇬🇹 Guatemala', 'America/Guatemala'], ['🇸🇻 El Salvador', 'America/El_Salvador'], ['🇭🇳 Honduras', 'America/Tegucigalpa'],
+  ['🇳🇮 Nicaragua', 'America/Managua'], ['🇨🇷 Costa Rica', 'America/Costa_Rica'], ['🇵🇦 Panamá', 'America/Panama'],
+  ['🇩🇴 República Dominicana', 'America/Santo_Domingo'], ['🇵🇷 Puerto Rico', 'America/Puerto_Rico'], ['🇧🇷 Brasil', 'America/Sao_Paulo']
+];
+const fdt = (d, o) => { try { return new Date(d).toLocaleString('es-MX', (o.timeZone || !S.settings.tz) ? o : {...o, timeZone:S.settings.tz}); } catch (e) { return new Date(d).toLocaleString('es-MX', o); } };
+const fWhen = d => fdt(d, {weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+const fDay = d => fdt(d, {day:'numeric', month:'short'});
+const decToAm = d => !d || d <= 1 ? null : d >= 2 ? Math.round((d - 1) * 100) : Math.round(-100 / (d - 1));
+const amTxt = o => o == null || o === '' ? '' : (o > 0 ? '+' + o : String(o));
+
 // ---------- estado ----------
 const KEY = 'mispicks-v1';
 let S;
@@ -320,24 +354,36 @@ function parseSummary(j) {
   (j.boxscore?.teams || []).forEach(t => (t.statistics || []).forEach(s => { const n = num(s.value ?? s.displayValue); if (n != null) G[s.name] = (G[s.name] || 0) + n; }));
   G._home = L.state === 'pre' ? null : L.home; G._away = L.state === 'pre' ? null : L.away;
   L.game = G;
+  const hc = (comp.competitors || []).find(c => c.homeAway === 'home');
+  if (j.pickcenter?.[0]) L.odds = oddsInfo(j.pickcenter[0], hc?.team?.abbreviation);
   return L;
+}
+function oddsInfo(o, hAbbr) {
+  o = o || {};
+  const pick = x => x && typeof x === 'object' ? (x.close ?? x.current ?? x.open ?? x) : x;
+  const am = x => { x = pick(x); if (x && typeof x === 'object') x = x.odds ?? x.american ?? x.value; if (x == null) return null; const t = String(x).trim(); if (/^even$/i.test(t)) return 100; const n = num(t.replace('+', '')); return n != null && Math.abs(n) >= 100 ? n : null; };
+  const ln = x => { x = pick(x); if (x && typeof x === 'object') x = x.line; return x == null ? null : num(String(x).replace(/^[ou]/i, '')); };
+  let spreadHome = null;
+  if (o.details === 'EVEN') spreadHome = 0;
+  else if (o.details) {
+    const m = o.details.match(/^(\S+)\s+([+-]?\d+(\.\d+)?)$/);
+    if (m && Math.abs(+m[2]) < 60) spreadHome = m[1] === hAbbr ? +m[2] : -m[2];
+  }
+  if (spreadHome == null) spreadHome = ln(o.pointSpread?.home);
+  return {
+    spreadHome, ou: num(o.overUnder) ?? ln(o.total?.over), details: o.details || '',
+    ml: {home: am(o.homeTeamOdds?.moneyLine) ?? am(o.moneyline?.home), away: am(o.awayTeamOdds?.moneyLine) ?? am(o.moneyline?.away), draw: am(o.drawOdds?.moneyLine) ?? am(o.moneyline?.draw)},
+    so: {home: am(o.homeTeamOdds?.spreadOdds) ?? am(o.pointSpread?.home), away: am(o.awayTeamOdds?.spreadOdds) ?? am(o.pointSpread?.away)},
+    to: {over: am(o.overOdds) ?? am(o.total?.over), under: am(o.underOdds) ?? am(o.total?.under)}
+  };
 }
 function evInfo(ev) {
   const c = ev.competitions?.[0] || {};
   const tm = x => ({id:x?.team?.id || null, name:x?.team?.displayName || x?.team?.name || '?', abbr:x?.team?.abbreviation || '', logo:x?.team?.logo || x?.team?.logos?.[0]?.href || ''});
   const h = c.competitors?.find(x => x.homeAway === 'home'), a = c.competitors?.find(x => x.homeAway === 'away');
-  const o = c.odds?.[0] || {};
-  let spreadHome = null;
-  if (o.details === 'EVEN') spreadHome = 0;
-  else if (o.details) {
-    const m = o.details.match(/^(\S+)\s+([+-]?\d+(\.\d+)?)$/);
-    if (m && Math.abs(+m[2]) < 60) spreadHome = m[1] === h?.team?.abbreviation ? +m[2] : -m[2];
-  }
   const st = c.status?.type || ev.status?.type || {};
-  const when = st.state === 'pre'
-    ? new Date(ev.date).toLocaleString('es-MX', {weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})
-    : st.shortDetail || '';
-  return {eventId:ev.id, date:ev.date, when, home:tm(h), away:tm(a), odds:{spreadHome, ou:num(o.overUnder), details:o.details || ''}};
+  const when = st.state === 'pre' ? fWhen(ev.date) : st.shortDetail || '';
+  return {eventId:ev.id, date:ev.date, when, home:tm(h), away:tm(a), odds:oddsInfo(c.odds?.[0], h?.team?.abbreviation)};
 }
 function parseRoster(j, abbr) {
   let arr = j.athletes || [];
@@ -364,32 +410,69 @@ async function last5(lg, playerId, d) {
     const m = {};
     e.stats.forEach((x, i) => [names[i], labels[i]].forEach(k => GROUPS.forEach(G => put(m, G, k, x))));
     const mt = meta[e.eventId] || {};
-    return {date:mt.gameDate, opp:((mt.atVs || '') + ' ' + (mt.opponent?.abbreviation || '')).trim(), val:d.get ? d.get(m) : null};
+    return {date:mt.gameDate, opp:((mt.atVs || '') + ' ' + (mt.opponent?.abbreviation || '')).trim(), val:d.get ? d.get(m) : null, m};
   });
 }
-function statsHTML(rows, d, side, line) {
+function statsHTML(rows, d, side, line, cols) {
   if (!rows.length) return '<div class="muted">No hay partidos recientes de este jugador.</div>';
+  cols = cols || [];
   const ok = rows.filter(r => r.val != null);
-  if (!ok.length) return '<div class="muted">ESPN no trae este dato en el historial del jugador.</div>';
-  const avg = ok.reduce((a, r) => a + r.val, 0) / ok.length;
-  const L = +line;
-  let hits = null, txt = '';
-  if (d.yes) { hits = ok.filter(r => r.val >= d.yes).length; txt = `Pegó en ${hits} de ${ok.length}`; }
-  else if (line !== '' && line != null && !isNaN(L)) {
-    hits = ok.filter(r => side === 'under' ? r.val < L : r.val > L).length;
-    txt = `${side === 'under' ? 'Abajo' : 'Arriba'} de ${fmt(L)} en ${hits} de ${ok.length}`;
-  }
-  return `<div class="kpis" style="margin:8px 0"><div class="kpi">Promedio últimos ${ok.length}<b>${fmt(avg)}</b></div><div class="kpi">Vs tu línea<b>${txt || '—'}</b></div></div>
-  <table><tr><th>Fecha</th><th>Rival</th><th>${esc(d.name)}</th></tr>${rows.map(r => `<tr><td>${r.date ? new Date(r.date).toLocaleDateString('es-MX', {day:'numeric', month:'short'}) : ''}</td><td>${esc(r.opp)}</td><td><b>${fmt(r.val)}</b></td></tr>`).join('')}</table>`;
+  let head = '';
+  if (ok.length) {
+    const avg = ok.reduce((a, r) => a + r.val, 0) / ok.length;
+    const L = +line;
+    let txt = '';
+    if (d.yes) txt = `Pegó en ${ok.filter(r => r.val >= d.yes).length} de ${ok.length}`;
+    else if (line !== '' && line != null && !isNaN(L)) txt = `${side === 'under' ? 'Abajo' : 'Arriba'} de ${fmt(L)} en ${ok.filter(r => side === 'under' ? r.val < L : r.val > L).length} de ${ok.length}`;
+    head = `<div class="kpis" style="margin:8px 0"><div class="kpi">Promedio ${esc(d.name.toLowerCase())}<b>${fmt(avg)}</b></div><div class="kpi">Vs tu línea<b>${txt || '—'}</b></div></div>`;
+  } else head = '<div class="muted" style="margin:8px 0">ESPN no trae el dato de tu pick en el historial, pero aquí van sus demás números.</div>';
+  const avgOf = f => { const xs = rows.map(r => f(r.m)).filter(x => typeof x === 'number'); return xs.length ? fmt(xs.reduce((a, x) => a + x, 0) / xs.length) : ''; };
+  return `${head}<div style="overflow-x:auto"><table><tr><th>Fecha</th><th>Rival</th><th>Pick</th>${cols.map(c => `<th>${esc(c[0])}</th>`).join('')}</tr>
+  ${rows.map(r => `<tr><td>${r.date ? fDay(r.date) : ''}</td><td>${esc(r.opp)}</td><td><b>${fmt(r.val)}</b></td>${cols.map(c => { const x = c[1](r.m); return `<td>${x == null ? '—' : typeof x === 'string' ? x : fmt(x)}</td>`; }).join('')}</tr>`).join('')}
+  <tr><td colspan="2" class="muted">Promedio</td><td></td>${cols.map(c => `<td class="muted">${avgOf(c[1])}</td>`).join('')}</tr></table></div>`;
+}
+async function teamLast5(lg, teamId) {
+  const base = `${API}${LEAGUES[lg].path}/teams/${teamId}/schedule`;
+  const parse = j => (j.events || []).filter(e => e.competitions?.[0]?.status?.type?.completed)
+    .sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5).map(e => {
+      const c = e.competitions[0];
+      const me = c.competitors.find(x => String(x.id ?? x.team?.id) === String(teamId)) || c.competitors[0];
+      const op = c.competitors.find(x => x !== me);
+      const sc = x => num(x?.score?.value ?? x?.score?.displayValue ?? x?.score);
+      return {date:e.date, opp:(me?.homeAway === 'home' ? 'vs ' : '@ ') + (op?.team?.abbreviation || op?.team?.shortDisplayName || '?'), my:sc(me), op:sc(op)};
+    }).filter(r => r.my != null && r.op != null);
+  let rows = parse(await getJSON(base));
+  if (!rows.length) { try { rows = parse(await getJSON(base + '?season=' + (new Date().getFullYear() - 1))); } catch (e) {} }
+  return rows;
+}
+function teamStatsHTML(rows, line, total, unit) {
+  if (!rows.length) return '<div class="muted">ESPN no trae partidos recientes de este equipo.</div>';
+  const w = rows.filter(r => r.my > r.op).length, l = rows.filter(r => r.my < r.op).length;
+  const avg = f => fmt(rows.reduce((a, r) => a + f(r), 0) / rows.length);
+  const cover = line != null ? rows.filter(r => r.my - r.op + line > 0).length : null;
+  const over = total != null ? rows.filter(r => r.my + r.op > total).length : null;
+  return `<div class="kpis" style="margin:8px 0">
+    <div class="kpi">Récord últimos ${rows.length}<b>${w}-${l}${rows.length - w - l ? '-' + (rows.length - w - l) : ''}</b></div>
+    <div class="kpi">Promedio ${unit}<b>${avg(r => r.my)} a favor · ${avg(r => r.op)} en contra</b></div>
+    <div class="kpi">${line != null ? `Habría cubierto ${signed(line)}` : 'Handicap'}<b>${cover != null ? `${cover} de ${rows.length}` : '—'}</b></div>
+    <div class="kpi">${total != null ? `Total arriba de ${fmt(total)}` : 'Total'}<b>${over != null ? `${over} de ${rows.length}` : '—'}</b></div>
+  </div>
+  <table><tr><th>Fecha</th><th>Rival</th><th>Marcador</th><th>Dif.</th><th>Total</th></tr>
+  ${rows.map(r => `<tr><td>${fDay(r.date)}</td><td>${esc(r.opp)}</td><td class="${r.my > r.op ? 'won' : r.my < r.op ? 'lost' : 'push'}"><b>${r.my > r.op ? 'G' : r.my < r.op ? 'P' : 'E'} ${r.my}-${r.op}</b></td><td>${signed(r.my - r.op) || 0}</td><td>${r.my + r.op}</td></tr>`).join('')}</table>
+  <div class="muted" style="margin-top:6px">El "habría cubierto" y el total usan tu línea de hoy, porque ESPN no guarda los momios de partidos pasados.</div>`;
 }
 
 let refreshing = false, firstLoad = true;
 async function refreshLive(force) {
   if (refreshing) return; refreshing = true;
-  const jobs = S.games.filter(g => g.eventId && (force || !LIVE[g.eventId] || LIVE[g.eventId].state !== 'post'));
-  await Promise.all(jobs.map(async g => {
-    try { LIVE[g.eventId] = parseSummary(await getJSON(`${API}${LEAGUES[g.league].path}/summary?event=${g.eventId}`)); } catch (e) {}
+  const evs = {};
+  S.games.forEach(g => { if (g.eventId) evs[g.eventId] = g.league; });
+  S.tickets.filter(t => !t.result).forEach(t => (t.legs || []).forEach(l => { if (l && l.eventId) evs[l.eventId] = l.league; }));
+  const jobs = Object.entries(evs).filter(([id]) => force || !LIVE[id] || LIVE[id].state !== 'post');
+  await Promise.all(jobs.map(async ([id, lg]) => {
+    try { LIVE[id] = parseSummary(await getJSON(`${API}${LEAGUES[lg].path}/summary?event=${id}`)); } catch (e) {}
   }));
+  S.games.forEach(g => { const l = g.eventId && LIVE[g.eventId]; if (l?.odds && !g.odds?.ml) g.odds = Object.assign({}, l.odds, g.odds?.spreadHome != null ? {spreadHome:g.odds.spreadHome} : {}, g.odds?.ou != null ? {ou:g.odds.ou} : {}); });
   refreshing = false; LAST_UPD = Date.now();
   render(); checkAlerts(firstLoad); firstLoad = false;
 }
@@ -405,16 +488,16 @@ function gFrac(g) {
   if (t === 'soc') return Math.min(1, (parseInt(l.clock) || 0) / 90);
   return Math.min(1, (p - 0.5) / 9);
 }
+function liveMap(g, p) {
+  const l = g.eventId && LIVE[g.eventId]; if (!l) return null;
+  if (p.pos === 'PAR') return l.game;
+  return (p.playerId && l.players?.[p.playerId]) || Object.values(l.players || {}).find(x => norm(x._name) === norm(p.playerName)) || null;
+}
 function pickVal(g, p) {
   const d = propDef(g.league, p.pos, p.prop) || {};
   const l = g.eventId && LIVE[g.eventId];
   if (p.manual || !l || !d.get) return {val:p.cur || 0, auto:false};
-  let m;
-  if (p.pos === 'PAR') m = l.game;
-  else {
-    m = p.playerId && l.players?.[p.playerId];
-    if (!m) m = Object.values(l.players || {}).find(x => norm(x._name) === norm(p.playerName));
-  }
+  const m = liveMap(g, p);
   const a = m ? d.get(m) : null;
   return {val:a ?? 0, auto:true};
 }
@@ -493,13 +576,40 @@ function findLeg(key) {
   if (kind === 'p') { const p = g.picks.find(x => x.id === pid); return p ? {g, kind:'prop', p} : null; }
   return {g, kind};
 }
+const clone = x => JSON.parse(JSON.stringify(x ?? null));
+function selOdds(g, kind, p) { return kind === 'winner' ? g.wOdds : kind === 'spread' ? g.spread.odds : kind === 'total' ? g.total.odds : p?.odds; }
+function makeLeg(g, kind, p, odds) {
+  return {id:uid(), kind, league:g.league, eventId:g.eventId || null, date:g.date, home:clone(g.home), away:clone(g.away),
+    winner:kind === 'winner' ? g.winner : null, spread:kind === 'spread' ? clone(g.spread) : {team:null, line:null},
+    total:kind === 'total' ? clone(g.total) : {side:null, line:null}, p:kind === 'prop' ? clone(p) : null,
+    odds:odds !== undefined ? odds : (selOdds(g, kind, p) ?? null), override:null};
+}
+function consumeSel(g, kind, p) {
+  if (kind === 'winner') { g.winner = null; g.wOdds = null; }
+  if (kind === 'spread') g.spread = {team:null, line:null, odds:null};
+  if (kind === 'total') { g.total.side = null; g.total.odds = null; }
+  if (kind === 'prop') g.picks = g.picks.filter(x => x.id !== p.id);
+  if (!gameLegs(g).length) S.games = S.games.filter(x => x.id !== g.id);
+}
+const legCtx = l => ({league:l.league, eventId:l.eventId, date:l.date, home:l.home, away:l.away, manualScore:{home:0, away:0}, scoreManual:false, final:false,
+  winner:l.winner, spread:l.spread || {}, total:l.total || {}, odds:{}, picks:[]});
+function evalTLeg(l) {
+  const g = legCtx(l);
+  if (l.override) return {status:l.override, text:l.override === 'won' ? 'Lo marcaste como que pegó' : 'Lo marcaste como que falló', pct:l.override === 'won' ? 1 : 0};
+  if (!l.eventId && l.kind !== 'prop') return {status:'pending', text:'Sin datos en vivo: márcalo con ✓ o ✗'};
+  return evalLeg(g, l.kind, l.p) || {status:'pending', text:''};
+}
+function migrate() {
+  S.tickets.forEach(t => {
+    if (t.result || !Array.isArray(t.legs) || !t.legs.some(x => typeof x === 'string')) return;
+    t.legs = t.legs.map(k => { if (typeof k !== 'string') return k; const f = findLeg(k); return f ? makeLeg(f.g, f.kind, f.p) : null; }).filter(Boolean);
+  });
+}
 function ticketEval(t) {
   if (t.result && t.snapshot) return {legs:t.snapshot, status:t.result};
-  const legs = t.legs.map(k => {
-    const f = findLeg(k);
-    if (!f) return {desc:'(pick borrado)', status:'pending', text:''};
-    const r = evalLeg(f.g, f.kind, f.p) || {status:'pending', text:'Sin selección'};
-    return {status:r.status, text:r.text, desc:legDesc(f.g, f.kind, f.p), league:f.g.league};
+  const legs = (t.legs || []).filter(l => l && typeof l === 'object').map(l => {
+    const r = evalTLeg(l), g = legCtx(l);
+    return {...r, desc:legDesc(g, l.kind, l.p), league:l.league, odds:l.odds, leg:l};
   });
   let status = 'pending';
   if (legs.some(l => l.status === 'lost')) status = 'lost';
@@ -543,7 +653,13 @@ function checkAlerts(silent) {
     const overish = l.kind === 'prop' ? (l.p.side === 'over' && !(propDef(g.league, l.p.pos, l.p.prop) || {}).yes) : (l.kind === 'total' && g.total.side === 'over');
     cur[l.key] = {status:r.status, near:overish && r.status === 'live' && (r.pct || 0) >= 0.85, desc:legDesc(g, l.kind, l.p)};
   }));
-  S.tickets.filter(t => !t.result).forEach(t => cur['T' + t.id] = {status:ticketEval(t).status, desc:t.name, ticket:true});
+  S.tickets.filter(t => !t.result).forEach(t => {
+    const e = ticketEval(t);
+    e.legs.forEach(x => { const l = x.leg; if (!l) return; const d = l.kind === 'prop' ? propDef(l.league, l.p.pos, l.p.prop) || {} : {};
+      const overish = l.kind === 'prop' ? l.p.side === 'over' && !d.yes : l.kind === 'total' && l.total.side === 'over';
+      cur['L' + l.id] = {status:x.status, near:overish && x.status === 'live' && (x.pct || 0) >= 0.85, desc:x.desc}; });
+    cur['T' + t.id] = {status:e.status, desc:t.name, ticket:true};
+  });
   if (!silent) for (const k in cur) {
     const a = cur[k], b = PREV[k]; if (!b) continue;
     if (a.ticket) {
@@ -589,18 +705,21 @@ function gamesView() {
   const nLegs = S.games.reduce((a, g) => a + gameLegs(g).length, 0);
   return `<div class="chips">${chips}</div>
   <button class="btn p full" style="margin-top:10px" onclick="A.addGame()">➕ Agregar partido${UI.league === 'all' ? '' : ' de ' + LEAGUES[UI.league].name}</button>
-  ${nLegs > 1 ? `<button class="btn g full" style="margin-top:8px" onclick="A.newTicket()">🎟️ Armar parlay con mis ${nLegs} selecciones</button>` : ''}
-  ${gs.map(gameCard).join('') || `<div class="empty">No tienes partidos${UI.league === 'all' ? '' : ' de esta liga'}.<br>Toca "Agregar partido". Puedes mezclar NFL, NBA, fútbol y MLB en un mismo parlay.</div>`}`;
+  ${nLegs ? `<button class="btn g full" style="margin-top:8px" onclick="A.newTicket()">🎟️ Crear boleto con mis selecciones (${nLegs})</button>` : ''}
+  ${gs.map(gameCard).join('') || `<div class="empty">No tienes partidos${UI.league === 'all' ? '' : ' de esta liga'}.<br>Toca "Agregar partido". Puedes hacer boletos sencillos o mezclar NFL, NBA, fútbol y MLB en un parlay.</div>`}`;
 }
+const oddsIn = (val, click, ph) => `<input class="ln" style="width:76px" inputmode="text" value="${esc(amTxt(val))}" placeholder="${ph || 'momio'}" onchange="${click}">`;
+const betBtn = key => `<button class="btn s g" onclick="A.newTicket(null,'${key}')">🎟️ Apostar</button>`;
 function gameCard(g) {
   const L = LEAGUES[g.league], t = L.type, sc = gScore(g), live = g.eventId && LIVE[g.eventId], st = gState(g);
-  const status = g.eventId ? (live ? live.detail : 'Cargando…') : (g.final ? 'Final (manual)' : 'Marcador manual');
-  const tm = s => `<div class="team">${g[s].logo ? `<img src="${esc(g[s].logo)}" alt="" onerror="this.remove()">` : ''}<span>${esc(g[s].abbr || g[s].name)}</span></div>`;
+  const status = g.eventId ? (live ? (live.state === 'pre' ? fWhen(g.date) : live.detail) : fWhen(g.date)) : (g.final ? 'Final (manual)' : 'Marcador manual');
+  const tm = s => `<div class="team" ${g[s].id ? `onclick="A.teamStats('${g.id}','${s}')" style="cursor:pointer"` : ''}>${g[s].logo ? `<img src="${esc(g[s].logo)}" alt="" onerror="this.remove()">` : ''}<span>${esc(g[s].abbr || g[s].name)}${g[s].id ? ' 📊' : ''}</span></div>`;
   const editing = UI.edit[g.id];
   const sBtns = s => SCORE_BTNS[t].map(n => `<button class="btn s g" onclick="A.score('${g.id}','${s}',${n})">+${n}</button>`).join('') + `<button class="btn s r" onclick="A.score('${g.id}','${s}',-1)">−1</button>`;
-  const sh = g.odds.spreadHome, ou = g.odds.ou;
+  const o = g.odds || {}, sh = o.spreadHome, ou = o.ou, n = gameLegs(g).length;
+  const mlTxt = o.ml && (o.ml.away != null || o.ml.home != null) ? ` <span class="muted">· ESPN: ${esc(tName(g,'away'))} ${amTxt(o.ml.away)} / ${esc(tName(g,'home'))} ${amTxt(o.ml.home)}${o.ml.draw != null ? ' / Empate ' + amTxt(o.ml.draw) : ''}</span>` : '';
   return `<div class="card">
-    <div class="between" style="margin-bottom:6px"><span class="chip on" style="padding:3px 10px;font-size:11px;cursor:default">${L.name}</span>${g.picks.length || gameLegs(g).length ? `<span class="muted">${gameLegs(g).length} ${gameLegs(g).length === 1 ? 'selección' : 'selecciones'}</span>` : ''}</div>
+    <div class="between" style="margin-bottom:6px"><span class="chip on" style="padding:3px 10px;font-size:11px;cursor:default">${L.name}</span>${n ? `<span class="muted">${n} ${n === 1 ? 'selección' : 'selecciones'}</span>` : ''}</div>
     <div class="score">${tm('away')}<div><div class="big">${sc.away} - ${sc.home}</div><div class="muted ${st === 'in' ? 'live' : ''}">${esc(status)}</div></div>${tm('home')}</div>
     <div class="row" style="justify-content:center;margin-top:8px">
       <button class="btn s ghost" onclick="A.toggleEdit('${g.id}')">✏️ ${editing ? 'Listo' : 'Editar marcador'}</button>
@@ -608,18 +727,19 @@ function gameCard(g) {
       ${!g.eventId ? `<button class="btn s ghost" onclick="A.toggleFinal('${g.id}')">${g.final ? '↩️ Reabrir' : '🏁 Terminó'}</button>` : ''}
     </div>
     ${editing ? `<div class="score" style="margin-top:8px"><div class="row" style="justify-content:center">${sBtns('away')}</div><div></div><div class="row" style="justify-content:center">${sBtns('home')}</div></div>` : ''}
-    <div class="sec"><div class="lbl">Ganador</div>
-      <div class="chips">${chip('Nulo', !g.winner, `A.setWinner('${g.id}',null)`)}${chip(tName(g,'away'), g.winner === 'away', `A.setWinner('${g.id}','away')`)}${chip(tName(g,'home'), g.winner === 'home', `A.setWinner('${g.id}','home')`)}${t === 'soc' ? chip('Empate', g.winner === 'draw', `A.setWinner('${g.id}','draw')`) : ''}</div>
+    <div class="sec"><div class="lbl">Ganador${mlTxt}</div>
+      <div class="row"><div class="chips">${chip('Nulo', !g.winner, `A.setWinner('${g.id}',null)`)}${chip(tName(g,'away'), g.winner === 'away', `A.setWinner('${g.id}','away')`)}${chip(tName(g,'home'), g.winner === 'home', `A.setWinner('${g.id}','home')`)}${t === 'soc' ? chip('Empate', g.winner === 'draw', `A.setWinner('${g.id}','draw')`) : ''}</div>
+      ${g.winner ? oddsIn(g.wOdds, `A.setOdds('${g.id}','winner',this.value)`) + betBtn(g.id + ':winner') : ''}</div>
       ${stLine(evalLeg(g, 'winner'))}
     </div>
-    <div class="sec"><div class="lbl">Handicap ${sh != null ? `<span class="muted">· ESPN: ${esc(g.home.abbr)} ${signed(sh)}</span>` : ''}</div>
+    <div class="sec"><div class="lbl">Handicap ${sh != null ? `<span class="muted">· ESPN: ${esc(g.home.abbr)} ${signed(sh)}${o.so?.home != null ? ` (${amTxt(o.so.home)} / ${amTxt(o.so.away)})` : ''}</span>` : ''}</div>
       <div class="row"><div class="chips">${chip('Nulo', !g.spread.team, `A.setSpread('${g.id}',null)`)}${chip(tName(g,'away'), g.spread.team === 'away', `A.setSpread('${g.id}','away')`)}${chip(tName(g,'home'), g.spread.team === 'home', `A.setSpread('${g.id}','home')`)}</div>
-      ${g.spread.team ? `<input class="ln" type="number" step="0.5" inputmode="decimal" value="${g.spread.line ?? ''}" placeholder="-3.5" onchange="A.setSpreadLine('${g.id}',this.value)">` : ''}</div>
+      ${g.spread.team ? `<input class="ln" type="number" step="0.5" inputmode="decimal" value="${g.spread.line ?? ''}" placeholder="-3.5" onchange="A.setSpreadLine('${g.id}',this.value)">` + oddsIn(g.spread.odds, `A.setOdds('${g.id}','spread',this.value)`) + (g.spread.line != null ? betBtn(g.id + ':spread') : '') : ''}</div>
       ${stLine(evalLeg(g, 'spread'))}
     </div>
-    <div class="sec"><div class="lbl">Total de ${UNIT[t]} ${ou != null ? `<span class="muted">· ESPN O/U ${fmt(ou)}</span>` : ''}</div>
+    <div class="sec"><div class="lbl">Total de ${UNIT[t]} ${ou != null ? `<span class="muted">· ESPN O/U ${fmt(ou)}${o.to?.over != null ? ` (O ${amTxt(o.to.over)} / U ${amTxt(o.to.under)})` : ''}</span>` : ''}</div>
       <div class="row"><div class="chips">${chip('Nulo', !g.total.side, `A.setTotal('${g.id}',null)`)}${chip('Over', g.total.side === 'over', `A.setTotal('${g.id}','over')`)}${chip('Under', g.total.side === 'under', `A.setTotal('${g.id}','under')`)}</div>
-      ${g.total.side ? `<input class="ln" type="number" step="0.5" inputmode="decimal" value="${g.total.line ?? ''}" placeholder="44.5" onchange="A.setTotalLine('${g.id}',this.value)">` : ''}</div>
+      ${g.total.side ? `<input class="ln" type="number" step="0.5" inputmode="decimal" value="${g.total.line ?? ''}" placeholder="44.5" onchange="A.setTotalLine('${g.id}',this.value)">` + oddsIn(g.total.odds, `A.setOdds('${g.id}','total',this.value)`) + (g.total.line != null ? betBtn(g.id + ':total') : '') : ''}</div>
       ${stLine(evalLeg(g, 'total'))}
     </div>
     <div class="sec"><div class="lbl">Picks de jugadores</div>
@@ -639,25 +759,55 @@ function pickCard(g, p) {
   const steps = d.yes ? [-1, 1] : isBig(d) ? [-1, 1, 5, 10] : [-1, 1];
   const barCls = r.status === 'won' ? 'ok' : r.status === 'lost' ? 'bad' : '';
   const base = `'${g.id}','${p.id}'`;
+  const sl = statLine(colsFor(g.league, p.pos), liveMap(g, p));
   return `<div class="pick ${r.status}">
     <div class="between"><div><b>${title}</b><div class="muted">${esc(sub)}</div></div>
       <div class="row">${p.playerId ? `<button class="btn s ghost" onclick="A.pStatsCard(${base})">📊</button>` : ''}<button class="btn s ghost" onclick="A.pDel(${base})">✕</button></div></div>
     <div class="between" style="margin-top:6px"><div class="val">${fmt(val)}</div><div style="text-align:right">${stLine(r)}</div></div>
+    ${sl ? `<div class="muted" style="margin-top:4px">📈 ${esc(sl)}</div>` : ''}
     <div class="bar"><div class="${barCls}" style="width:${Math.round((r.pct || 0) * 100)}%"></div></div>
     <div class="between" style="margin-top:8px">
       <div class="row">${steps.map(n => `<button class="btn s ${n < 0 ? 'r' : 'g'}" onclick="A.pAdj(${base},${n})">${n > 0 ? '+' : '−'}${Math.abs(n)}</button>`).join('')}</div>
       <div class="row">${g.eventId && d.get ? (auto ? '<span class="muted">⚡ ESPN</span>' : `<button class="btn s ghost" onclick="A.pAuto(${base})">⚡ ESPN</button>`) : ''}
         <button class="btn s ghost" title="Marcar que pegó" onclick="A.pOverride(${base},'won')">✓</button><button class="btn s ghost" title="Marcar que falló" onclick="A.pOverride(${base},'lost')">✗</button></div>
     </div>
+    <div class="row" style="margin-top:8px;justify-content:flex-end">${oddsIn(p.odds, `A.pOdds(${base},this.value)`)}${betBtn(g.id + ':p:' + p.id)}</div>
   </div>`;
+}
+function legLive(l) {
+  if (!l.eventId) return '';
+  const lv = LIVE[l.eventId], A_ = l.away.abbr || l.away.name, H_ = l.home.abbr || l.home.name;
+  if (!lv || lv.state === 'pre') return `${A_} @ ${H_} · ${fWhen(l.date)}`;
+  return `${A_} ${lv.away} - ${lv.home} ${H_} · ${lv.detail}`;
 }
 function ticketCard(t) {
   const e = ticketEval(t), dec = amToDec(t.odds), pay = t.stake * dec;
   const lab = {won:'✅ Ganado', lost:'❌ Perdido', live:'⏳ En juego', pending:'• Pendiente', void:'↔️ Anulado'};
-  const closed = !!t.result;
+  const closed = !!t.result, n = e.legs.length;
+  const legHTML = x => {
+    const l = x.leg;
+    let extra = '';
+    if (l && !closed) {
+      const live = legLive(l);
+      const d = l.kind === 'prop' ? propDef(l.league, l.p.pos, l.p.prop) || {} : {};
+      const g = legCtx(l);
+      const sl = l.kind === 'prop' ? statLine(colsFor(l.league, l.p.pos), liveMap(g, l.p)) : '';
+      const val = l.kind === 'prop' ? pickVal(g, l.p).val : null;
+      const steps = l.kind === 'prop' && (!l.eventId || l.p.manual) ? (d.yes ? [-1, 1] : isBig(d) ? [-1, 1, 5, 10] : [-1, 1]) : [];
+      const b = `'${t.id}','${l.id}'`;
+      extra = `${live ? `<div class="muted">🏟️ ${esc(live)}</div>` : ''}
+        ${l.kind === 'prop' ? `<div class="muted">Lleva <b style="color:var(--txt)">${fmt(val)}</b>${sl ? ` · 📈 ${esc(sl)}` : ''}</div>` : ''}
+        <div class="row" style="margin-top:4px">${steps.map(k => `<button class="btn s ${k < 0 ? 'r' : 'g'}" onclick="A.lAdj(${b},${k})">${k > 0 ? '+' : '−'}${Math.abs(k)}</button>`).join('')}
+          ${l.kind === 'prop' && l.eventId ? (l.p.manual ? `<button class="btn s ghost" onclick="A.lAuto(${b})">⚡ ESPN</button>` : `<button class="btn s ghost" onclick="A.lManual(${b})">✏️ manual</button>`) : ''}
+          <button class="btn s ghost" onclick="A.lOverride(${b},'won')">✓</button><button class="btn s ghost" onclick="A.lOverride(${b},'lost')">✗</button></div>`;
+    }
+    const cls = x.status === 'live' ? (x.good ? 'won' : x.bad ? 'lost' : 'live') : x.status;
+    return `<div class="leg"><span>${ICON[x.status] || '•'}</span><div style="flex:1"><div class="between"><span>${esc(x.desc)}</span>${x.odds != null ? `<span class="muted">${amTxt(x.odds)}</span>` : ''}</div>
+      ${x.text ? `<div class="${cls}" style="font-weight:700;font-size:13px">${esc(x.text)}${x.proj != null && x.status === 'live' ? ` <span class="muted">· a este ritmo ${fmt(x.proj)}</span>` : ''}</div>` : ''}${extra}</div></div>`;
+  };
   return `<div class="card">
-    <div class="between"><div><b>${esc(t.name)}</b><div class="muted">${t.legs.length} selecciones · momio ${t.odds > 0 ? '+' : ''}${esc(t.odds)} (${dec.toFixed(2)})</div></div><div class="st ${e.status}" style="margin:0">${lab[e.status]}</div></div>
-    <div style="margin-top:8px">${e.legs.map(l => `<div class="leg"><span>${ICON[l.status] || '•'}</span><div><div>${esc(l.desc)}</div>${l.text ? `<div class="muted ${l.status}">${esc(l.text)}</div>` : ''}</div></div>`).join('')}</div>
+    <div class="between"><div><b>${esc(t.name)}</b><div class="muted">${n === 1 ? 'Sencilla' : `Parlay · ${n} selecciones`} · momio ${amTxt(t.odds)} (${dec.toFixed(2)})</div></div><div class="st ${e.status}" style="margin:0">${lab[e.status]}</div></div>
+    <div style="margin-top:8px">${e.legs.map(legHTML).join('')}</div>
     <div class="kpis" style="margin-top:8px"><div class="kpi">Apuesta<b>${money(t.stake)}</b></div><div class="kpi">${closed ? 'Cobrado' : 'Cobras si pega'}<b>${money(closed ? t.payout : pay)}</b></div></div>
     <div class="row" style="margin-top:10px">
       <button class="btn s" onclick="A.share('${t.id}')">📤 Compartir</button>
@@ -669,8 +819,8 @@ function ticketCard(t) {
 }
 function ticketsView() {
   const open = S.tickets.filter(t => !t.result);
-  return `<button class="btn p full" onclick="A.newTicket()">➕ Nuevo boleto / parlay</button>
-  ${open.map(ticketCard).join('') || '<div class="empty">No tienes boletos abiertos.<br>Primero agrega partidos y picks, luego arma aquí tu boleto.</div>'}`;
+  return `<button class="btn p full" onclick="A.newTicket()">➕ Nuevo boleto (sencillo o parlay)</button>
+  ${open.map(ticketCard).join('') || '<div class="empty">No tienes boletos abiertos.<br>En Partidos escoge ganador, handicap, total o un pick y toca 🎟️ Apostar.</div>'}`;
 }
 function tLeague(t) {
   const set = new Set((t.snapshot || []).map(l => l.league).filter(Boolean));
@@ -700,6 +850,10 @@ function settingsView() {
       : USER ? `<div class="between"><span>Conectado como <b>${esc(USER.email)}</b></span><button class="btn s" onclick="A.logout()">Salir</button></div>`
       : `<div class="muted" style="margin-bottom:8px">Entra con la misma cuenta de Google en el celular y en la compu.</div><button class="btn p full" onclick="A.login()">Entrar con Google</button>`}
   </div>
+  <div class="card"><div class="lbl">País y zona horaria</div>
+    <div class="between"><span>${esc((COUNTRIES.find(c => c[1] === S.settings.tz) || ['Sin escoger'])[0])}</span><button class="btn s" onclick="A.askCountry()">Cambiar</button></div>
+    <div class="muted" style="margin-top:6px">Los horarios de los partidos se muestran en esta zona.</div>
+  </div>
   <div class="card"><div class="lbl">Alertas</div>
     <div class="between"><span>Sonido, vibración y notificaciones</span><button class="btn s ${S.settings.alerts ? 'g' : ''}" onclick="A.toggleAlerts()">${S.settings.alerts ? 'Activadas' : 'Activar'}</button></div>
     <button class="btn s ghost" style="margin-top:8px" onclick="A.testAlert()">🔔 Probar alerta</button>
@@ -715,7 +869,14 @@ function settingsView() {
 
 // ---------- modales ----------
 function openModal(html) { $('#sheet').innerHTML = html; $('#modal').classList.add('on'); }
-A.close = () => { MOD = null; $('#modal').classList.remove('on'); };
+A.close = () => { if (MOD && MOD.force) return; MOD = null; $('#modal').classList.remove('on'); };
+A.askCountry = force => {
+  let dev = ''; try { dev = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+  MOD = {type:'country', force:!!force};
+  openModal(`${force ? '<h3 style="margin-bottom:6px">👋 ¡Bienvenido a Mis Picks!</h3><div class="muted" style="margin-bottom:10px">¿De dónde eres? Así te muestro los horarios de los partidos en tu hora.</div>' : modalHead('País y zona horaria')}
+    ${COUNTRIES.map((c, i) => `<div class="ev" onclick="A.setCountry(${i})" style="${c[1] === (S.settings.tz || dev) ? 'border-color:var(--acc)' : ''}"><div class="between"><b>${c[0]}</b><span class="muted">${fdt(Date.now(), {hour:'2-digit', minute:'2-digit', timeZone:c[1]})}</span></div></div>`).join('')}`);
+};
+A.setCountry = i => { S.settings.tz = COUNTRIES[i][1]; MOD = null; $('#modal').classList.remove('on'); toast('Listo: ' + COUNTRIES[i][0]); save(); };
 const modalHead = title => `<div class="between" style="margin-bottom:10px"><h3>${title}</h3><button class="btn s ghost" onclick="A.close()">✕</button></div>`;
 
 // agregar partido
@@ -780,18 +941,28 @@ A.tab = t => { UI.tab = t; window.scrollTo(0, 0); render(); };
 A.league = k => { UI.league = k; render(); };
 A.refresh = () => { toast('Actualizando…'); refreshLive(true); };
 A.toggleEdit = id => { UI.edit[id] = !UI.edit[id]; render(); };
-A.setWinner = (id, w) => { const g = gameById(id); g.winner = g.winner === w ? null : w; save(); };
+A.teamStats = async (gid, side) => {
+  const g = gameById(gid), tm = g[side];
+  const sh = g.odds?.spreadHome;
+  const line = g.spread.team === side && g.spread.line != null ? +g.spread.line : sh != null ? (side === 'home' ? sh : -sh) : null;
+  const total = g.total.line ?? g.odds?.ou ?? null;
+  openModal(`${modalHead('📊 ' + esc(tm.name))}<div class="muted">Últimos 5 partidos</div><div id="statsBox"><div class="muted" style="margin-top:8px">Cargando…</div></div>`);
+  try { $('#statsBox').innerHTML = teamStatsHTML(await teamLast5(g.league, tm.id), line, total, UNIT[LEAGUES[g.league].type]); }
+  catch (e) { $('#statsBox').innerHTML = '<div class="muted">No se pudo cargar el historial de ESPN.</div>'; }
+};
+A.setWinner = (id, w) => { const g = gameById(id); g.winner = g.winner === w ? null : w; g.wOdds = g.winner ? (g.odds?.ml?.[g.winner] ?? null) : null; save(); };
+A.setOdds = (id, kind, val) => { const g = gameById(id), o = parseOdds(val); if (kind === 'winner') g.wOdds = o; else g[kind].odds = o; save(); };
 A.setSpread = (id, team) => {
   const g = gameById(id);
-  if (!team || g.spread.team === team) { g.spread = {team:null, line:null}; save(); return; }
+  if (!team || g.spread.team === team) { g.spread = {team:null, line:null, odds:null}; save(); return; }
   const base = g.odds.spreadHome;
   let line = g.spread.line;
   if (base != null) line = team === 'home' ? base : -base;
   else if (line != null && g.spread.team && g.spread.team !== team) line = -line;
-  g.spread = {team, line}; save();
+  g.spread = {team, line, odds:base != null ? (g.odds?.so?.[team] ?? null) : (g.spread.odds ?? null)}; save();
 };
 A.setSpreadLine = (id, val) => { gameById(id).spread.line = num(val); save(); };
-A.setTotal = (id, side) => { const g = gameById(id); g.total.side = g.total.side === side ? null : side; if (g.total.line == null) g.total.line = g.odds.ou; save(); };
+A.setTotal = (id, side) => { const g = gameById(id); g.total.side = g.total.side === side ? null : side; if (g.total.line == null) g.total.line = g.odds.ou; g.total.odds = g.total.side ? (g.odds?.to?.[g.total.side] ?? null) : null; save(); };
 A.setTotalLine = (id, val) => { gameById(id).total.line = num(val); save(); };
 A.score = (id, side, d) => {
   const g = gameById(id);
@@ -826,8 +997,9 @@ function renderPickModal() {
       ${d.yes ? '<div class="muted" style="margin-top:6px">Este pick es de sí o no: gana si pasa.</div>' : `
       <div class="row" style="margin-top:8px"><div class="chips">${chip('Over', MOD.side === 'over', "A.pSide('over')")}${chip('Under', MOD.side === 'under', "A.pSide('under')")}</div>
       <input class="ln" id="pLine" type="number" step="0.5" inputmode="decimal" placeholder="Línea" value="${esc(MOD.line)}" oninput="A.pLine(this.value)"></div>`}
+      <div class="row" style="margin-top:8px"><span class="muted">Momio (opcional)</span><input class="ln" style="width:90px" inputmode="text" placeholder="+120" value="${esc(MOD.odds || '')}" oninput="MOD.odds=this.value"></div>
     </div>
-    ${MOD.player?.id && d.get ? `<div class="sec"><button class="btn s" onclick="A.pStats()">📊 Ver últimos 5 partidos</button><div id="statsBox">${MOD.stats}</div></div>` : ''}
+    ${MOD.player?.id ? `<div class="sec"><button class="btn s" onclick="A.pStats()">📊 Ver últimos 5 partidos</button><div id="statsBox">${MOD.stats}</div></div>` : ''}
     <button class="btn p full" style="margin-top:14px" onclick="A.savePick()">Guardar pick</button>`);
   renderSug();
 }
@@ -853,7 +1025,7 @@ A.pLine = val => { MOD.line = val; };
 A.pStats = async () => {
   const g = gameById(MOD.gid), d = propDef(g.league, MOD.pos, MOD.prop), box = $('#statsBox');
   box.innerHTML = '<div class="muted">Cargando…</div>';
-  try { MOD.stats = statsHTML(await last5(g.league, MOD.player.id, d), d, MOD.side, MOD.line); }
+  try { MOD.stats = statsHTML(await last5(g.league, MOD.player.id, d), d, MOD.side, MOD.line, colsFor(g.league, MOD.pos)); }
   catch (e) { MOD.stats = '<div class="muted">No se pudo cargar el historial de ESPN.</div>'; }
   if ($('#statsBox')) $('#statsBox').innerHTML = MOD.stats;
 };
@@ -863,7 +1035,7 @@ A.savePick = () => {
   const line = d.yes ? d.yes - 0.5 : num(MOD.line);
   if (line == null) { toast('Pon la línea'); return; }
   g.picks.push({id:uid(), pos:MOD.pos, prop:MOD.prop, playerId:MOD.player?.id || null, playerName:MOD.player?.name || '', teamAbbr:MOD.player?.team || '', playerPos:MOD.player?.pos || '',
-    side:d.yes ? 'over' : MOD.side, line, cur:0, manual:false, override:null});
+    side:d.yes ? 'over' : MOD.side, line, cur:0, manual:false, override:null, odds:parseOdds(MOD.odds)});
   A.close(); save();
 };
 
@@ -871,6 +1043,7 @@ A.savePick = () => {
 const pickBy = (gid, pid) => { const g = gameById(gid); return {g, p:g.picks.find(x => x.id === pid)}; };
 A.pAdj = (gid, pid, n) => { const {g, p} = pickBy(gid, pid); const cur = pickVal(g, p).val; p.manual = true; p.cur = Math.max(0, cur + n); save(); };
 A.pAuto = (gid, pid) => { pickBy(gid, pid).p.manual = false; save(); };
+A.pOdds = (gid, pid, val) => { pickBy(gid, pid).p.odds = parseOdds(val); save(); };
 A.pOverride = (gid, pid, r) => { const {p} = pickBy(gid, pid); p.override = p.override === r ? null : r; save(); };
 A.pDel = (gid, pid) => {
   if (!confirmTap('p' + pid, 'Toca otra vez ✕ para borrar el pick')) return;
@@ -879,53 +1052,83 @@ A.pDel = (gid, pid) => {
 A.pStatsCard = async (gid, pid) => {
   const {g, p} = pickBy(gid, pid), d = propDef(g.league, p.pos, p.prop);
   openModal(`${modalHead('📊 ' + esc(p.playerName))}<div class="muted">${esc(d.name)}${d.yes ? '' : ` · ${p.side === 'over' ? 'Over' : 'Under'} ${fmt(p.line)}`}</div><div id="statsBox"><div class="muted" style="margin-top:8px">Cargando…</div></div>`);
-  try { $('#statsBox').innerHTML = statsHTML(await last5(g.league, p.playerId, d), d, p.side, p.line); }
+  try { $('#statsBox').innerHTML = statsHTML(await last5(g.league, p.playerId, d), d, p.side, p.line, colsFor(g.league, p.pos)); }
   catch (e) { $('#statsBox').innerHTML = '<div class="muted">No se pudo cargar el historial de ESPN.</div>'; }
 };
 
 // boletos
-A.newTicket = id => {
+A.newTicket = (id, preKey) => {
   const t = id ? S.tickets.find(x => x.id === id) : null;
-  MOD = {type:'ticket', id:t?.id || null, name:t?.name || `Boleto ${S.tickets.length + 1}`, stake:t?.stake ?? 100, odds:t?.odds ?? '', legs:new Set(t?.legs || [])};
-  const games = S.games.filter(g => gameLegs(g).length);
-  openModal(`${modalHead(t ? 'Editar boleto' : 'Nuevo boleto / parlay')}
+  const avail = [];
+  S.games.forEach(g => gameLegs(g).forEach(l => avail.push({key:l.key, gid:g.id, kind:l.kind, pid:l.p?.id || null, on:l.key === preKey, odds:selOdds(g, l.kind, l.p) ?? null, desc:legDesc(g, l.kind, l.p), game:`${LEAGUES[g.league].name} · ${tName(g,'away')} @ ${tName(g,'home')}`})));
+  const existing = t ? (t.legs || []).filter(l => l && typeof l === 'object').map(l => ({leg:l, on:true, odds:l.odds ?? null, desc:legDesc(legCtx(l), l.kind, l.p)})) : [];
+  MOD = {type:'ticket', id:t?.id || null, name:t?.name || `Boleto ${S.tickets.length + 1}`, stake:t?.stake ?? 100, odds:t ? amTxt(t.odds) : '', touched:!!t, avail, existing};
+  const row = (x, i, list) => `<label class="chk"><input type="checkbox" ${x.on ? 'checked' : ''} onchange="A.tLeg('${list}',${i},this.checked)"><span style="flex:1">${esc(x.desc)}</span><input class="ln" style="width:76px" inputmode="text" placeholder="momio" value="${esc(amTxt(x.odds))}" oninput="A.tLegOdds('${list}',${i},this.value)" onclick="event.stopPropagation()"></label>`;
+  let lastGame = '';
+  openModal(`${modalHead(t ? 'Editar boleto' : 'Nuevo boleto')}
     <input style="width:100%" value="${esc(MOD.name)}" oninput="MOD.name=this.value" placeholder="Nombre">
     <div class="row" style="margin-top:8px">
       <div style="flex:1"><div class="lbl">Apuesta ($)</div><input style="width:100%" type="number" inputmode="decimal" value="${esc(MOD.stake)}" oninput="MOD.stake=this.value;A.tCalc()"></div>
-      <div style="flex:1"><div class="lbl">Momio total</div><input style="width:100%" inputmode="text" value="${esc(MOD.odds)}" placeholder="+350 o -110" oninput="MOD.odds=this.value;A.tCalc()"></div>
+      <div style="flex:1"><div class="lbl">Momio total</div><input id="tOdds" style="width:100%" inputmode="text" value="${esc(MOD.odds)}" placeholder="+350 o -110" oninput="MOD.odds=this.value;MOD.touched=this.value!=='';A.tCalc()"></div>
     </div>
     <div id="tCalc" class="muted" style="margin-top:6px"></div>
-    <div class="sec"><div class="lbl">Selecciones</div>
-    ${games.length ? games.map(g => `<div class="muted" style="margin-top:10px;font-weight:700">${LEAGUES[g.league].name} · ${esc(tName(g,'away'))} @ ${esc(tName(g,'home'))}</div>
-      ${gameLegs(g).map(l => `<label class="chk"><input type="checkbox" ${MOD.legs.has(l.key) ? 'checked' : ''} onchange="A.tLeg('${l.key}',this.checked)">${esc(legDesc(g, l.kind, l.p))}</label>`).join('')}`).join('')
-      : '<div class="muted">Primero agrega partidos y escoge ganador, handicap, total o picks en la pestaña Partidos.</div>'}
+    ${existing.length ? `<div class="sec"><div class="lbl">En este boleto</div>${existing.map((x, i) => row(x, i, 'existing')).join('')}</div>` : ''}
+    <div class="sec"><div class="lbl">${existing.length ? 'Agregar de tus partidos' : 'Selecciones'}</div>
+    ${avail.length ? avail.map((x, i) => { const h = x.game !== lastGame ? `<div class="muted" style="margin-top:10px;font-weight:700">${esc(x.game)}</div>` : ''; lastGame = x.game; return h + row(x, i, 'avail'); }).join('')
+      : '<div class="muted">No tienes selecciones pendientes. En Partidos escoge ganador, handicap, total o agrega un pick.</div>'}
     </div>
+    <div class="muted" style="margin-top:8px">Lo que metas al boleto se quita de Partidos. El boleto se sigue actualizando en vivo por su cuenta.</div>
     <button class="btn p full" style="margin-top:14px" onclick="A.saveTicket()">Guardar boleto</button>`);
+  if (t) { const au = tAutoOdds(); MOD.touched = au == null || au !== t.odds; }
   A.tCalc();
 };
-A.tLeg = (k, on) => { on ? MOD.legs.add(k) : MOD.legs.delete(k); };
+const tChosen = () => [...MOD.existing.filter(x => x.on), ...MOD.avail.filter(x => x.on)];
+function tAutoOdds() {
+  const c = tChosen(); if (!c.length || c.some(x => x.odds == null)) return null;
+  return decToAm(c.reduce((a, x) => a * amToDec(x.odds), 1));
+}
+A.tLeg = (list, i, on) => { MOD[list][i].on = on; A.tCalc(); };
+A.tLegOdds = (list, i, val) => { MOD[list][i].odds = parseOdds(val); A.tCalc(); };
 A.tCalc = () => {
-  const o = parseOdds(MOD.odds), st = num(MOD.stake) || 0, el = $('#tCalc'); if (!el) return;
-  if (o == null) { el.textContent = 'Pon el momio que te da la casa de apuestas (americano como +350, o decimal como 4.5).'; return; }
+  const el = $('#tCalc'); if (!el) return;
+  const c = tChosen(), auto = tAutoOdds();
+  if (!MOD.touched) { MOD.odds = auto != null ? amTxt(auto) : ''; const inp = $('#tOdds'); if (inp && document.activeElement !== inp) inp.value = MOD.odds; }
+  const o = parseOdds(MOD.odds), st = num(MOD.stake) || 0;
+  const tipo = c.length === 0 ? 'Escoge al menos una selección' : c.length === 1 ? 'Sencilla' : `Parlay de ${c.length}`;
+  const calc = auto != null ? ` · calculado ${amTxt(auto)}${MOD.touched && o !== auto ? ` <a href="#" onclick="MOD.touched=false;A.tCalc();return false">usar este</a>` : ''}` : c.length ? ' · pon el momio de cada selección para calcularlo solo' : '';
+  if (o == null) { el.innerHTML = `<b>${tipo}</b>${calc}`; return; }
   const dec = amToDec(o);
-  el.innerHTML = `Decimal <b>${dec.toFixed(2)}</b> · Cobras <b>${money(st * dec)}</b> · Ganancia <b>${money(st * dec - st)}</b>`;
+  el.innerHTML = `<b>${tipo}</b>${calc}<br>Decimal <b>${dec.toFixed(2)}</b> · Cobras <b>${money(st * dec)}</b> · Ganancia <b>${money(st * dec - st)}</b>`;
 };
 A.saveTicket = () => {
-  if (!MOD.legs.size) { toast('Escoge al menos una selección'); return; }
-  const o = parseOdds(MOD.odds); if (o == null) { toast('Pon el momio'); return; }
-  const data = {name:MOD.name || 'Boleto', stake:num(MOD.stake) || 0, odds:o, legs:[...MOD.legs]};
+  const c = tChosen();
+  if (!c.length) { toast('Escoge al menos una selección'); return; }
+  const o = parseOdds(MOD.odds); if (o == null) { toast('Pon el momio total o el de cada selección'); return; }
+  const legs = MOD.existing.filter(x => x.on).map(x => Object.assign(x.leg, {odds:x.odds}));
+  MOD.avail.filter(x => x.on).forEach(x => {
+    const g = gameById(x.gid); if (!g) return;
+    const p = x.pid ? g.picks.find(q => q.id === x.pid) : null;
+    legs.push(makeLeg(g, x.kind, p, x.odds));
+    consumeSel(g, x.kind, p);
+  });
+  const data = {name:MOD.name || 'Boleto', stake:num(MOD.stake) || 0, odds:o, legs};
   if (MOD.id) Object.assign(S.tickets.find(t => t.id === MOD.id), data);
   else S.tickets.push({id:uid(), created:Date.now(), result:null, ...data});
-  A.close(); UI.tab = 'tickets'; save();
+  MOD = null; $('#modal').classList.remove('on'); UI.tab = 'tickets'; save(); refreshLive();
 };
+const legBy = (tid, lid) => { const t = S.tickets.find(x => x.id === tid); return t && (t.legs || []).find(l => l.id === lid); };
+A.lOverride = (tid, lid, r) => { const l = legBy(tid, lid); l.override = l.override === r ? null : r; save(); };
+A.lAdj = (tid, lid, k) => { const l = legBy(tid, lid); const cur = pickVal(legCtx(l), l.p).val; l.p.manual = true; l.p.cur = Math.max(0, cur + k); save(); };
+A.lManual = (tid, lid) => { const l = legBy(tid, lid); l.p.cur = pickVal(legCtx(l), l.p).val; l.p.manual = true; save(); };
+A.lAuto = (tid, lid) => { legBy(tid, lid).p.manual = false; save(); };
 A.closeT = (id, res) => {
   const t = S.tickets.find(x => x.id === id), e = ticketEval(t);
-  t.snapshot = e.legs.map(l => ({desc:l.desc, status:res === 'void' ? 'push' : l.status, text:l.text || '', league:l.league}));
+  t.snapshot = e.legs.map(l => ({desc:l.desc, status:res === 'void' ? 'push' : l.status, text:l.text || '', league:l.league, odds:l.odds ?? null}));
   t.result = res; t.closedAt = Date.now();
   t.payout = res === 'won' ? t.stake * amToDec(t.odds) : res === 'void' ? t.stake : 0;
   toast('Guardado en tu historial'); save();
 };
-A.reopen = id => { const t = S.tickets.find(x => x.id === id); t.result = null; t.snapshot = null; t.payout = 0; save(); };
+A.reopen = id => { const t = S.tickets.find(x => x.id === id); if (!(t.legs || []).some(l => l && typeof l === 'object')) { toast('Este boleto es de la versión anterior y no se puede reabrir'); return; } t.result = null; t.snapshot = null; t.payout = 0; save(); };
 A.delTicket = id => {
   if (!confirmTap('t' + id, 'Toca otra vez 🗑 para borrar el boleto')) return;
   S.tickets = S.tickets.filter(t => t.id !== id); save();
@@ -941,7 +1144,7 @@ A.share = id => {
   x.fillStyle = '#3b82f6'; x.font = 'bold 34px system-ui,sans-serif'; x.fillText('🎯 MIS PICKS', P + 10, 110);
   x.fillStyle = '#e8ebf2'; x.font = 'bold 56px system-ui,sans-serif'; x.fillText(fit(t.name, W - 2 * P - 20), P + 10, 185);
   x.fillStyle = '#8a93a6'; x.font = '30px system-ui,sans-serif';
-  x.fillText(`${t.legs.length} selecciones · momio ${t.odds > 0 ? '+' : ''}${t.odds} (${dec.toFixed(2)})`, P + 10, 240);
+  x.fillText(`${e.legs.length === 1 ? 'Sencilla' : 'Parlay · ' + e.legs.length + ' selecciones'} · momio ${amTxt(t.odds)} (${dec.toFixed(2)})`, P + 10, 240);
   const col = {won:'#2fbf71', lost:'#ff5c5c', live:'#f2b136', pending:'#8a93a6', push:'#9aa4ff'};
   let y = 320;
   e.legs.forEach(l => {
@@ -984,16 +1187,15 @@ A.importFile = inp => {
   const f = inp.files[0]; if (!f) return;
   f.text().then(txt => {
     const d = JSON.parse(txt); if (!Array.isArray(d.games)) throw 0;
-    S = d; S.tickets = S.tickets || []; S.settings = Object.assign({interval:30, alerts:false}, S.settings || {});
+    S = d; S.tickets = S.tickets || []; S.settings = Object.assign({interval:30, alerts:false}, S.settings || {}); migrate();
     toast('Respaldo cargado'); save(); refreshLive(true);
   }).catch(() => toast('Ese archivo no es un respaldo válido'));
   inp.value = '';
 };
 A.cleanup = () => {
   if (!confirmTap('clean', 'Toca otra vez para borrar los partidos terminados')) return;
-  const used = new Set(S.tickets.filter(t => !t.result).flatMap(t => t.legs.map(k => k.split(':')[0])));
   const before = S.games.length;
-  S.games = S.games.filter(g => gState(g) !== 'post' || used.has(g.id));
+  S.games = S.games.filter(g => gState(g) !== 'post');
   toast(`Se borraron ${before - S.games.length} partidos`); save();
 };
 
@@ -1013,7 +1215,7 @@ function initFirebase() {
         const r = d.data();
         if ((r.updatedAt || 0) > (S.updatedAt || 0)) {
           try {
-            const keep = S.settings; S = JSON.parse(r.data); S.tickets = S.tickets || []; S.settings = Object.assign({}, S.settings || {}, keep);
+            const keep = S.settings; S = JSON.parse(r.data); S.tickets = S.tickets || []; S.settings = Object.assign({}, S.settings || {}, keep, keep.tz ? {} : {tz:(JSON.parse(r.data).settings || {}).tz}); migrate();
             localStorage.setItem(KEY, JSON.stringify(S)); render(); refreshLive(); toast('🔄 Sincronizado');
           } catch (e) {}
         } else if ((r.updatedAt || 0) < (S.updatedAt || 0)) pushRemote(true);
@@ -1043,8 +1245,10 @@ let TIMER;
 function startTimer() { clearInterval(TIMER); TIMER = setInterval(() => refreshLive(), (S.settings.interval || 30) * 1000); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLive(); });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+migrate();
 initFirebase();
 render();
+if (!S.settings.tz) A.askCountry(true);
 refreshLive();
 startTimer();
 </script>
